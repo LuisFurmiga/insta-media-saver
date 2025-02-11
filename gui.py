@@ -1,20 +1,50 @@
-import tkinter as tk
-from tkinter import ttk, messagebox
-import threading
+from dotenv import load_dotenv # type: ignore
 from download import download_story, download_post  # Importa as funções do arquivo principal
-from dotenv import load_dotenv
+from session import check_session_valid # type: ignore
+from tkinter import ttk, messagebox
 import os
+import subprocess
+import sys
+import threading
+import tkinter as tk
+
+# Criar a interface Tk antes de verificar a sessão
+root = tk.Tk()
+root.withdraw()  # Esconde a janela enquanto a verificação acontece
 
 # Carregar as variáveis do arquivo .env
-load_dotenv()
+ENV_FILE = ".env"
+load_dotenv(ENV_FILE)
 
 # Recuperar o caminho da sessão do .env
 SESSION_FILE = os.getenv("INSTALOADER_SESSION_FILE")
 USERNAME_ENV = os.getenv("INSTALOADER_USERNAME")
 
-if not SESSION_FILE:
-    messagebox.showerror("Erro", "Caminho da sessão não encontrado no arquivo .env. Certifique-se de realizar o login primeiro.")
-    exit()
+def close_gui():
+    root.quit()  # Fecha a interface gráfica
+    root.update()  # Garante que a interface seja encerrada antes do próximo comando
+    try:
+        if sys.platform == "win32":
+            subprocess.Popen(["python", "login.py"])  # Abre login.py sem bloquear a execução
+        else:
+            pass
+    except Exception as e:
+        print(f"Erro ao abrir login.py: {e}")
+    sys.exit(0)  # Ao invés de os._exit(0)
+
+def logout():
+    """Função para realizar logout, remover sessão e redirecionar para login.py"""
+    confirm = messagebox.askyesno("Confirmar Logout", "Tem certeza que deseja sair?")
+    if confirm:
+        try:
+            if SESSION_FILE and os.path.exists(SESSION_FILE):
+                os.remove(SESSION_FILE)  # Remove o arquivo da sessão
+                os.remove(ENV_FILE) # Remove o arquivo .env
+            messagebox.showinfo("Logout", "Logout realizado com sucesso!")
+            close_gui()
+
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao realizar logout: {e}")
 
 def update_status(message):
     status_label.config(text=message)
@@ -72,18 +102,32 @@ def empty_line(frame, row, column):
     """Cria uma linha vazia para espaçamento."""
     ttk.Label(frame, text="").grid(row=row, column=column, pady=5)
 
+if not check_session_valid(USERNAME_ENV, SESSION_FILE):
+    print("Sessão inválida ou inexistente. Abrindo tela de login...")
+    close_gui()
+else:
+    print("Sessão válida encontrada. Abrindo GUI...")
+    root.deiconify()  # Mostra a janela novamente
+
 BUTTON_WIDTH = 17
 LABEL_WIDTH = 22
 ENTRY_WIDTH = 30
 SCREEN_WIDTH = 350
-SCREEN_HEIGHT = 175
+SCREEN_HEIGHT = 200
 SCREEN_SIZE = f"{SCREEN_WIDTH}x{SCREEN_HEIGHT}"
 
 # Interface Gráfica
-root = tk.Tk()
 root.title("Downloader de Instagram")
 root.geometry(SCREEN_SIZE)
 root.resizable(False, False)
+
+# Barra superior com usuário logado
+frame_top = ttk.Frame(root)
+frame_top.pack(fill="x")
+user_label = ttk.Label(frame_top, text=f"Usuário logado: {USERNAME_ENV}", anchor="w")
+user_label.pack(side="left", padx=10)
+logout_button = ttk.Button(frame_top, text="Logout", command=logout)
+logout_button.pack(side="right", padx=10)
 
 # Criando as abas
 notebook = ttk.Notebook(root)
@@ -128,7 +172,3 @@ status_label = ttk.Label(root, text="", anchor="center")
 status_label.pack()
 
 root.mainloop()
-
-
-
-

@@ -1,33 +1,54 @@
-import instaloader
-import tkinter as tk
+from dotenv import load_dotenv, set_key # type: ignore
+from session import check_session_valid # type: ignore
 from tkinter import ttk, messagebox
-from tkinter import simpledialog
+import instaloader # type: ignore
 import os
-from dotenv import load_dotenv, set_key
-
-# Nome do arquivo .env
-ENV_FILE = ".env"
+import subprocess
+import sys
+import tkinter as tk
 
 # Carregar as variáveis do arquivo .env
-def load_session_from_env():
-    load_dotenv(ENV_FILE)
-    session_file = os.getenv("INSTALOADER_SESSION_FILE")
-    username = os.getenv("INSTALOADER_USERNAME")
-    return session_file, username
+ENV_FILE = ".env"
+load_dotenv(ENV_FILE)
+
+# Recuperar o caminho da sessão do .env
+SESSION_FILE = os.getenv("INSTALOADER_SESSION_FILE")
+USERNAME_ENV = os.getenv("INSTALOADER_USERNAME")
+
+def close_login():
+    root.quit()  # Fecha a interface gráfica
+    root.update()  # Garante que a interface seja encerrada antes do próximo comando
+    try:
+        if sys.platform == "win32":
+            subprocess.Popen(["python", "gui.py"])  # Abre gui.py sem bloquear a execução
+        else:
+            pass
+    except Exception as e:
+        print(f"Erro ao abrir login.py: {e}")
+    sys.exit(0)  # Ao invés de os._exit(0)
 
 # Função para salvar o caminho da sessão no .env
 def save_session_to_env(username):
-    session_dir = os.path.join(os.path.expanduser("~"), "AppData", "Local", "Instaloader")
+    session_dir = os.getcwd()
     session_file = os.path.join(session_dir, f"session-{username}")
 
-    if not os.path.exists(session_dir):
-        os.makedirs(session_dir)
-
-    # Salvar o caminho no arquivo .env
     set_key(ENV_FILE, "INSTALOADER_SESSION_FILE", session_file)
-    # Salvar o nome de usuário no arquivo .env
     set_key(ENV_FILE, "INSTALOADER_USERNAME", username)
-    messagebox.showinfo("Sucesso", f"Login salvo em {session_file}")
+
+# Função para salvar sessão e atualizar o .env
+def save_login_session(loader, username):
+    session_dir = os.getcwd()
+    session_file = os.path.join(session_dir, f"session-{username}")
+
+    # Salvar sessão no arquivo
+    loader.save_session_to_file(filename=session_file)
+
+    # Salvar caminho da sessão no .env
+    save_session_to_env(username)
+
+    # Exibir mensagem de sucesso e fechar a interface
+    messagebox.showinfo("Sucesso", "Login realizado com sucesso e sessão salva!")
+    close_login()
 
 # Solicitar o código 2FA
 def ask_2fa_code(loader, username):
@@ -72,35 +93,48 @@ def perform_login():
 
     try:
         loader.login(username, password)
-        save_session_to_env(username)
-        messagebox.showinfo("Sucesso", "Login realizado com sucesso!")
-        root.destroy()  # Fechar a janela após o login bem-sucedido
+        save_login_session(loader, username)
     except instaloader.exceptions.TwoFactorAuthRequiredException:
         ask_2fa_code(loader, username)
+        save_login_session(loader, username)
     except Exception as e:
         messagebox.showerror("Erro", f"Erro ao realizar login: {e}")
+
+def start_login():
+    if check_session_valid(USERNAME_ENV, SESSION_FILE):
+        print("Sessão válida encontrada. Abrindo GUI...")
+        close_login()
+    print("Sessão inválida ou inexistente. Abrindo tela de login...")
+    root.mainloop()
+
+BUTTON_WIDTH = 17
+LABEL_WIDTH = 13
+ENTRY_WIDTH = 30
+SCREEN_WIDTH = 300
+SCREEN_HEIGHT = 120
+SCREEN_SIZE = f"{SCREEN_WIDTH}x{SCREEN_HEIGHT}"
 
 # Interface gráfica
 root = tk.Tk()
 root.title("Login no Instaloader")
-root.geometry("300x120")
+root.geometry(SCREEN_SIZE)
 root.resizable(False, False)
 
 frame = ttk.Frame(root, padding="10")
 frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
 
 # Campo de username
-ttk.Label(frame, text="Username:").grid(row=0, column=0, sticky=tk.W, pady=5)
-username_entry = ttk.Entry(frame, width=30)
+ttk.Label(frame, text="Username:", width=LABEL_WIDTH).grid(row=0, column=0, sticky=tk.W, pady=5)
+username_entry = ttk.Entry(frame, width=ENTRY_WIDTH)
 username_entry.grid(row=0, column=1, pady=5)
 
 # Campo de senha
-ttk.Label(frame, text="Senha:").grid(row=1, column=0, sticky=tk.W, pady=5)
-password_entry = ttk.Entry(frame, width=30, show="*")
+ttk.Label(frame, text="Senha:",width=LABEL_WIDTH).grid(row=1, column=0, sticky=tk.W, pady=5)
+password_entry = ttk.Entry(frame, width=ENTRY_WIDTH, show="*")
 password_entry.grid(row=1, column=1, pady=5)
 
 # Botão de login
 login_button = ttk.Button(frame, text="Login", command=perform_login)
 login_button.grid(row=2, column=0, columnspan=2, pady=10)
 
-root.mainloop()
+start_login()

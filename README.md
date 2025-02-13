@@ -67,7 +67,7 @@ Insta-Media-Saver/
 │── requirements.py    # Instalação automática de pacotes
 │── session.py         # Gerenciamento de sessão
 │── .env               # Arquivo onde a sessão e usuário são salvos
-│── requirements.txt   # Lista de pacotes necessários
+└── requirements.txt   # Lista de pacotes necessários
 ```
 
 ## ❗ Notas
